@@ -4,6 +4,8 @@
  * Tratamento global de erros
  */
 
+import logger from "../utils/logger";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
 // Criar instância do fetch com interceptadores
@@ -35,10 +37,8 @@ class ApiClient {
 
     const url = `${this.baseURL}${endpoint}`;
     
-    // Log para debug (apenas em desenvolvimento)
-    if (import.meta.env.DEV) {
-      console.log(`🌐 Requisição: ${options.method || "GET"} ${url}`);
-    }
+    // Log da requisição
+    logger.debug(`Requisição ${options.method || "GET"}`, { url, endpoint });
 
     try {
       const response = await fetch(url, {
@@ -48,6 +48,7 @@ class ApiClient {
 
       // Se não autorizado, limpar token e redirecionar
       if (response.status === 401 || response.status === 403) {
+        logger.warn("Requisição não autorizada", { url, status: response.status });
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         window.location.href = "/login";
@@ -73,9 +74,11 @@ class ApiClient {
 
       // Verificar se a resposta indica sucesso (mesmo com status 200)
       if (data.success === false) {
+        logger.error("Resposta com success: false", { url, data });
         throw new Error(data.message || "Erro na requisição");
       }
 
+      logger.api(options.method || "GET", url, response.status);
       return data;
     } catch (error) {
       // Tratar erros de rede (ERR_FAILED, ERR_CONNECTION_REFUSED, etc.)
@@ -87,9 +90,11 @@ class ApiClient {
           errorMessage.includes("failed") ||
           errorMessage.includes("refused")
         ) {
-          console.error("❌ Erro de conexão com o servidor:", error.message);
-          console.error("🔗 URL tentada:", url);
-          console.error("🔧 Base URL configurada:", this.baseURL);
+          logger.error("Erro de conexão com o servidor", {
+            url,
+            baseURL: this.baseURL,
+            error: error.message,
+          });
           throw new Error(
             `Não foi possível conectar ao servidor em ${this.baseURL}. Verifique se o backend está rodando.`
           );
@@ -97,12 +102,11 @@ class ApiClient {
       }
       
       if (error instanceof Error) {
-        // Log do erro para debug
-        if (import.meta.env.DEV) {
-          console.error("❌ Erro na requisição:", error.message);
-        }
+        logger.error("Erro na requisição", { url, error: error.message });
         throw error;
       }
+      
+      logger.error("Erro desconhecido na requisição", { url });
       throw new Error("Erro desconhecido na requisição");
     }
   }

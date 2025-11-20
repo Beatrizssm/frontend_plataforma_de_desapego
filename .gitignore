@@ -12,6 +12,10 @@ dist/
 build/
 *.log
 
+# Test coverage
+coverage/
+*.lcov
+
 # IDE
 .vscode/
 .idea/
