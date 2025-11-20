@@ -151,6 +151,7 @@ export function useChat({ itemId, onNewMessage }: UseChatOptions) {
   // Carregar histórico de mensagens
   const loadMessages = useCallback(async () => {
     try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
       const token = localStorage.getItem("token");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -160,7 +161,7 @@ export function useChat({ itemId, onNewMessage }: UseChatOptions) {
       }
 
       const response = await fetch(
-        `${SOCKET_URL.replace(":4000", "")}/api/chat/messages/${itemId}`,
+        `${API_URL}/chat/${itemId}`,
         { headers }
       );
 

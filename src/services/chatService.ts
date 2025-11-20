@@ -53,7 +53,7 @@ class ChatService {
    * Busca mensagens de um item específico
    */
   async getMessages(itemId: number): Promise<Message[]> {
-    const response = await api.get<MessagesResponse>(`/chat/messages/${itemId}`);
+    const response = await api.get<MessagesResponse>(`/chat/${itemId}`);
     return response.data || [];
   }
 
