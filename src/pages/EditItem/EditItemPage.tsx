@@ -1,28 +1,30 @@
 /**
- * Página de Adicionar Item
- * Design conforme imagem
+ * Página de Editar Item
+ * Design conforme AddItemPage
  */
 
-import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Textarea } from "./ui/textarea";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
-import { itemService } from "../services/itemService";
-import { useAuth } from "../hooks/useAuth";
-import { AppLayout } from "../layout/AppLayout";
+import { itemService, Item } from "../../services/itemService";
+import { useAuth } from "../../hooks/useAuth";
+import { AppLayout } from "../../layout/AppLayout";
 
 type Category = "Roupa" | "Acessórios" | "Beleza" | "Calçado" | "Bolsa" | "Eletrônico" | "Móvel" | "Eletrodoméstico";
 type BusinessType = "Venda" | "Doação" | "Troca";
 
-export function AddItemPage() {
+export function EditItemPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const [item, setItem] = useState<Item | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<Category | "">("");
@@ -30,11 +32,57 @@ export function AddItemPage() {
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingItem, setLoadingItem] = useState(true);
+
+  useEffect(() => {
+    const loadItem = async () => {
+      if (!id) {
+        toast.error("ID do item não fornecido");
+        navigate("/home");
+        return;
+      }
+
+      try {
+        setLoadingItem(true);
+        const itemId = parseInt(id);
+        if (isNaN(itemId)) {
+          toast.error("ID de item inválido");
+          navigate("/home");
+          return;
+        }
+
+        const fetchedItem = await itemService.getItemById(itemId);
+        
+        // Verificar se o usuário é o dono
+        if (user && fetchedItem.ownerId !== user.id) {
+          toast.error("Você não tem permissão para editar este item");
+          navigate("/home");
+          return;
+        }
+
+        setItem(fetchedItem);
+        setTitle(fetchedItem.title);
+        setDescription(fetchedItem.description);
+        
+        // Se o item tem imagem, adicionar ao preview
+        if (fetchedItem.imageUrl) {
+          setImagePreviews([fetchedItem.imageUrl]);
+        }
+      } catch (error: any) {
+        toast.error("Erro ao carregar item: " + (error.message || "Erro desconhecido"));
+        navigate("/home");
+      } finally {
+        setLoadingItem(false);
+      }
+    };
+
+    loadItem();
+  }, [id, navigate, user]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
-    if (images.length + files.length > 5) {
+    if (imagePreviews.length + files.length > 5) {
       toast.error("Máximo de 5 fotos permitidas");
       return;
     }
@@ -62,45 +110,51 @@ export function AddItemPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title || !description || !category || !businessType) {
+    if (!item) return;
+    
+    if (!title || !description) {
       toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-
-    if (images.length < 2) {
-      toast.error("Adicione no mínimo 2 fotos");
-      return;
-    }
-
-    if (images.length > 5) {
-      toast.error("Máximo de 5 fotos permitidas");
       return;
     }
 
     setLoading(true);
     try {
-      // Por enquanto, usar a primeira imagem como imageUrl
-      // Em produção, você faria upload das imagens para um serviço de storage
-      const imageUrl = imagePreviews[0] || "";
+      // Usar a primeira imagem como imageUrl
+      const imageUrl = imagePreviews[0] || item.imageUrl || "";
       
-      await itemService.createItem({
+      await itemService.updateItem(item.id, {
         title,
         description,
-        price: businessType === "Doação" ? 0 : 100, // Preço padrão, pode ser ajustado
-        available: true,
         imageUrl: imageUrl || undefined,
       });
 
-      toast.success("Item criado com sucesso!");
-      navigate("/home");
+      toast.success("Item atualizado com sucesso!");
+      navigate(`/item/${item.id}`);
     } catch (error: any) {
-      toast.error("Erro ao criar item: " + (error.message || "Erro desconhecido"));
+      toast.error("Erro ao atualizar item: " + (error.message || "Erro desconhecido"));
     } finally {
       setLoading(false);
     }
   };
 
   const categories: Category[] = ["Roupa", "Acessórios", "Beleza", "Calçado", "Bolsa", "Eletrônico", "Móvel", "Eletrodoméstico"];
+
+  if (loadingItem) {
+    return (
+      <AppLayout showHeader={false} showFooter={false}>
+        <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5941F2] mx-auto mb-4"></div>
+            <p className="text-[#3A3A3A]">Carregando item...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!item) {
+    return null;
+  }
 
   return (
     <AppLayout showHeader={false} showFooter={false}>
@@ -117,7 +171,7 @@ export function AddItemPage() {
             }}
           />
           <Button
-            onClick={() => navigate("/home")}
+            onClick={() => navigate(`/item/${item.id}`)}
             variant="outline"
             className="bg-transparent border-white text-white hover:bg-white/20"
           >
@@ -128,7 +182,7 @@ export function AddItemPage() {
         {/* Main Content */}
         <main className="flex-1 px-4 py-6 max-w-4xl mx-auto w-full">
           <h1 className="text-xl font-bold text-[#3A3A3A] text-center mb-4">
-            Adicionar novo item
+            Editar item
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -181,7 +235,6 @@ export function AddItemPage() {
                       checked={category === cat}
                       onChange={(e) => setCategory(e.target.value as Category)}
                       className="w-3.5 h-3.5 text-[#5941F2] focus:ring-[#5941F2]"
-                      required
                     />
                     <span className="text-[#303030] text-sm font-medium">{cat}</span>
                   </label>
@@ -267,7 +320,6 @@ export function AddItemPage() {
                       checked={businessType === type}
                       onChange={(e) => setBusinessType(e.target.value as BusinessType)}
                       className="w-3.5 h-3.5 text-[#5941F2] focus:ring-[#5941F2]"
-                      required
                     />
                     <span className="text-[#303030] text-sm">{type}</span>
                   </label>
@@ -275,7 +327,7 @@ export function AddItemPage() {
               </div>
             </div>
 
-            {/* Botão Adicionar */}
+            {/* Botão Salvar */}
             <div className="flex justify-center pt-2">
               <Button
                 type="submit"
@@ -283,7 +335,7 @@ export function AddItemPage() {
                 variant="default"
                 className="px-6 py-2 text-sm font-normal"
               >
-                {loading ? "Adicionando..." : "Adicionar"}
+                {loading ? "Salvando..." : "Salvar alterações"}
               </Button>
             </div>
           </form>
@@ -340,3 +392,4 @@ export function AddItemPage() {
     </AppLayout>
   );
 }
+

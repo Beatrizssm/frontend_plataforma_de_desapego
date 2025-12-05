@@ -124,6 +124,29 @@ class AuthService {
       return null;
     }
   }
+
+  /**
+   * Altera a senha do usuário
+   */
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    logger.auth("changePassword", false, {});
+    
+    try {
+      const response = await api.post<{ success: boolean; message: string }>("/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+      
+      if (response.success) {
+        logger.auth("changePassword", true, {});
+      }
+      
+      return response;
+    } catch (error) {
+      logger.auth("changePassword", false, { error });
+      throw error;
+    }
+  }
 }
 
 export const authService = new AuthService();

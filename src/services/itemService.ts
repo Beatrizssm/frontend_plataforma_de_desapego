@@ -6,12 +6,15 @@
 import api from "./api";
 import logger from "../utils/logger";
 
+export type ItemStatus = "DISPONIVEL" | "RESERVADO" | "DOADO_VENDIDO";
+
 export interface Item {
   id: number;
   title: string;
   description: string;
   price: number;
   available: boolean;
+  status: ItemStatus;
   imageUrl?: string | null;
   ownerId: number;
   owner: {
@@ -27,6 +30,7 @@ export interface CreateItemData {
   description: string;
   price: number;
   available?: boolean;
+  status?: ItemStatus;
   imageUrl?: string;
 }
 
@@ -35,6 +39,7 @@ export interface UpdateItemData {
   description?: string;
   price?: number;
   available?: boolean;
+  status?: ItemStatus;
   imageUrl?: string;
 }
 
@@ -120,6 +125,51 @@ class ItemService {
       logger.info("Item deletado com sucesso", { itemId: id });
     } catch (error) {
       logger.error("Erro ao deletar item", { itemId: id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza o status de um item (requer autenticação e ser dono)
+   */
+  async updateItemStatus(id: number, status: ItemStatus): Promise<Item> {
+    try {
+      logger.info("Atualizando status do item", { itemId: id, status });
+      const response = await api.patch<ItemResponse>(`/items/${id}/status`, { status });
+      logger.info("Status do item atualizado com sucesso", { itemId: id, status });
+      return response.data;
+    } catch (error) {
+      logger.error("Erro ao atualizar status do item", { itemId: id, status, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Reserva um item disponível (qualquer usuário autenticado pode reservar)
+   */
+  async reserveItem(id: number): Promise<Item> {
+    try {
+      logger.info("Reservando item", { itemId: id });
+      const response = await api.post<ItemResponse>(`/items/${id}/reserve`);
+      logger.info("Item reservado com sucesso", { itemId: id });
+      return response.data;
+    } catch (error) {
+      logger.error("Erro ao reservar item", { itemId: id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Compra um item disponível ou reservado (qualquer usuário autenticado pode comprar)
+   */
+  async buyItem(id: number): Promise<Item> {
+    try {
+      logger.info("Comprando item", { itemId: id });
+      const response = await api.post<ItemResponse>(`/items/${id}/buy`);
+      logger.info("Item comprado com sucesso", { itemId: id });
+      return response.data;
+    } catch (error) {
+      logger.error("Erro ao comprar item", { itemId: id, error });
       throw error;
     }
   }
